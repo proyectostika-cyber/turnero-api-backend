@@ -65,6 +65,25 @@ func NewServer(config util.Config, store *db.Store) (*Server, error) {
 	app.Use("/register", authLimiter)
 	app.Use("/login", authLimiter)
 
+	// N8N integration rate limiter: higher limit for automation workflows.
+	n8nLimiter := limiter.New(limiter.Config{
+		Max:        500,
+		Expiration: 1 * time.Minute,
+		KeyGenerator: func(c *fiber.Ctx) string {
+			// Key by IP + API Key to prevent abuse across tenants
+			apiKey := c.Get("X-API-Key", "")
+			if apiKey != "" && len(apiKey) > 8 {
+				// Use last 8 chars to avoid logging full key
+				return c.IP() + ":n8n:" + apiKey[len(apiKey)-8:]
+			}
+			return c.IP()
+		},
+		LimitReached: func(c *fiber.Ctx) error {
+			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{"error": "rate limit exceeded for integration"})
+		},
+	})
+	app.Use("/api/v1/integrations", n8nLimiter)
+
 	server := &Server{
 		Config:     config,
 		Store:      store,

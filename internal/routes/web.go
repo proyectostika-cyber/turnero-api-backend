@@ -55,6 +55,24 @@ func SetupRoutes(server *api.Server) error {
 
 	v1 := auth.Group("/api/v1")
 
+	// ── N8N Integration routes (API Key authentication) ─────────────────────
+	// These routes duplicate some authenticated routes but use X-API-Key instead of JWT.
+	// Rate limited separately (500 req/min vs 200 global).
+	n8nGroup := v1.Group("/integrations", middleware.APIKeyMiddleware(server.Config))
+
+	// Webhook remains public at /api/v1/webhooks/evolution (no change to existing route)
+	// But also available here with API key for consistency
+	n8nGroup.Post("/webhooks/evolution", conversationHandler.EvolutionWebhook)
+
+	// Read-only endpoints (GET)
+	n8nGroup.Get("/services", middleware.RequireTenant("tenant_id"), adminHandler.ListServices)
+	n8nGroup.Get("/providers", middleware.RequireTenant("tenant_id"), adminHandler.ListProviders)
+	n8nGroup.Get("/availability", middleware.RequireTenant("tenant_id"), schedulingHandler.Availability)
+
+	// Write endpoints (POST)
+	n8nGroup.Post("/appointments", appointmentHandler.Create)
+	n8nGroup.Post("/inbound-messages", conversationHandler.InboundMessage)
+
 	// ── Role shortcuts ───────────────────────────────────────────────────────
 	adminOnly := middleware.RequireRole("adminUser")
 	adminOrTenant := middleware.RequireRole("adminUser", "tenantUser")
