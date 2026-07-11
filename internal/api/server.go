@@ -36,7 +36,7 @@ func NewServer(config util.Config, store *db.Store) (*Server, error) {
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: allowedOrigins,
 		AllowMethods: "GET,POST,HEAD,PUT,DELETE,PATCH,OPTIONS",
-		AllowHeaders: "Origin,Content-Type,Accept,Authorization",
+		AllowHeaders: "Origin,Content-Type,Accept,Authorization,X-API-Key,X-Tenant-ID",
 	}))
 
 	// Global rate limiter: 200 requests per minute per IP across all routes.

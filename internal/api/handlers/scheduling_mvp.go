@@ -104,9 +104,18 @@ func (h *SchedulingMVPHandler) GenerateSlots(c *fiber.Ctx) error {
 }
 
 func (h *SchedulingMVPHandler) Availability(c *fiber.Ctx) error {
-	tenantID, err := uuid.Parse(c.Query("tenant_id"))
+	// Try to get tenant_id from unified source (N8N context or JWT payload)
+	tenantID, err := GetTenantIDUnified(c)
 	if err != nil {
-		return response.Error(c, response.ErrInvalidInput)
+		// Fallback: try query param for backwards compatibility
+		tenantIDStr := c.Query("tenant_id")
+		if tenantIDStr == "" {
+			return response.Error(c, response.ErrInvalidInput)
+		}
+		tenantID, err = uuid.Parse(tenantIDStr)
+		if err != nil {
+			return response.Error(c, response.ErrInvalidInput)
+		}
 	}
 	providerID, err := queryUUID(c, "provider_id")
 	if err != nil {

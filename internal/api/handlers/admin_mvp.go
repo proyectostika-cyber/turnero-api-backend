@@ -72,9 +72,18 @@ func (h *AdminMVPHandler) DeactivateTenant(c *fiber.Ctx) error {
 }
 
 func (h *AdminMVPHandler) ListProviders(c *fiber.Ctx) error {
-	tenantID, err := uuid.Parse(c.Query("tenant_id"))
+	// Try to get tenant_id from unified source (N8N context or JWT payload)
+	tenantID, err := GetTenantIDUnified(c)
 	if err != nil {
-		return response.Error(c, response.ErrInvalidInput)
+		// Fallback: try query param for backwards compatibility
+		tenantIDStr := c.Query("tenant_id")
+		if tenantIDStr == "" {
+			return response.Error(c, response.ErrInvalidInput)
+		}
+		tenantID, err = uuid.Parse(tenantIDStr)
+		if err != nil {
+			return response.Error(c, response.ErrInvalidInput)
+		}
 	}
 	active, err := queryBool(c, "active")
 	if err != nil {
@@ -159,9 +168,18 @@ func (h *AdminMVPHandler) DeactivateProvider(c *fiber.Ctx) error {
 }
 
 func (h *AdminMVPHandler) ListServices(c *fiber.Ctx) error {
-	tenantID, err := uuid.Parse(c.Query("tenant_id"))
+	// Try to get tenant_id from unified source (N8N context or JWT payload)
+	tenantID, err := GetTenantIDUnified(c)
 	if err != nil {
-		return response.Error(c, response.ErrInvalidInput)
+		// Fallback: try query param for backwards compatibility
+		tenantIDStr := c.Query("tenant_id")
+		if tenantIDStr == "" {
+			return response.Error(c, response.ErrInvalidInput)
+		}
+		tenantID, err = uuid.Parse(tenantIDStr)
+		if err != nil {
+			return response.Error(c, response.ErrInvalidInput)
+		}
 	}
 	active, err := queryBool(c, "active")
 	if err != nil {
@@ -246,9 +264,18 @@ func (h *AdminMVPHandler) DeactivateService(c *fiber.Ctx) error {
 }
 
 func (h *AdminMVPHandler) ListCustomers(c *fiber.Ctx) error {
-	tenantID, err := uuid.Parse(c.Query("tenant_id"))
+	// Try to get tenant_id from unified source (N8N context or JWT payload)
+	tenantID, err := GetTenantIDUnified(c)
 	if err != nil {
-		return response.Error(c, response.ErrInvalidInput)
+		// Fallback: try query param for backwards compatibility
+		tenantIDStr := c.Query("tenant_id")
+		if tenantIDStr == "" {
+			return response.Error(c, response.ErrInvalidInput)
+		}
+		tenantID, err = uuid.Parse(tenantIDStr)
+		if err != nil {
+			return response.Error(c, response.ErrInvalidInput)
+		}
 	}
 	rsp, err := h.service.ListCustomers(c.Context(), tenantID, c.Query("search"), pagination.FromCtx(c))
 	if err != nil {
@@ -313,9 +340,18 @@ func (h *AdminMVPHandler) UpdateCustomer(c *fiber.Ctx) error {
 }
 
 func (h *AdminMVPHandler) ListTenantChannels(c *fiber.Ctx) error {
-	tenantID, err := uuid.Parse(c.Query("tenant_id"))
+	// Try to get tenant_id from unified source (N8N context or JWT payload)
+	tenantID, err := GetTenantIDUnified(c)
 	if err != nil {
-		return response.Error(c, response.ErrInvalidInput)
+		// Fallback: try query param for backwards compatibility
+		tenantIDStr := c.Query("tenant_id")
+		if tenantIDStr == "" {
+			return response.Error(c, response.ErrInvalidInput)
+		}
+		tenantID, err = uuid.Parse(tenantIDStr)
+		if err != nil {
+			return response.Error(c, response.ErrInvalidInput)
+		}
 	}
 	active, err := queryBool(c, "active")
 	if err != nil {

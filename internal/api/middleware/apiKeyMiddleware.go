@@ -12,6 +12,8 @@ const APIKeyAuthKey = "api_key_auth"
 
 // APIKeyMiddleware validates the X-API-Key header against the configured N8N API key.
 // Uses constant-time comparison to prevent timing attacks.
+// This middleware only handles authentication. Tenant validation should be done
+// separately using ValidateTenantFromRequest middleware for multi-tenant endpoints.
 func APIKeyMiddleware(config util.Config) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		apiKey := c.Get("X-API-Key")

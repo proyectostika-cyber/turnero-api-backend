@@ -45,6 +45,39 @@ func SetupRoutes(server *api.Server) error {
 	// ── Webhook (public — Evolution calls without JWT) ──────────────────────
 	server.App.Post("/api/v1/webhooks/evolution", conversationHandler.EvolutionWebhook)
 
+	// ═══════════════════════════════════════════════════════════════════════
+	// N8N INTEGRATION ROUTES (API Key auth only, NO JWT required)
+	// ═══════════════════════════════════════════════════════════════════════
+	// Routes under /api/v1/n8n/* are exclusively for N8N integration.
+	// Authentication: X-API-Key header (validated by APIKeyMiddleware)
+	// Tenant isolation: X-Tenant-ID header or tenant_id in body/query (validated by ValidateTenantFromRequest)
+	// Rate limited separately at 500 req/min (configured in server.go)
+
+	n8n := server.App.Group("/api/v1/n8n",
+		middleware.APIKeyMiddleware(server.Config),
+		middleware.ValidateTenantFromRequest(server.Store))
+
+	// GET - Query endpoints (tenant_id from X-Tenant-ID header or query param)
+	n8n.Get("/services", adminHandler.ListServices)
+	n8n.Get("/providers", adminHandler.ListProviders)
+	n8n.Get("/customers", adminHandler.ListCustomers)
+	n8n.Get("/availability", schedulingHandler.Availability)
+	n8n.Get("/appointments", appointmentHandler.List)
+	n8n.Get("/appointments/:id", appointmentHandler.Get)
+
+	// POST - Create endpoints (tenant_id from X-Tenant-ID header or body)
+	n8n.Post("/customers", adminHandler.CreateCustomer)
+	n8n.Post("/appointments", appointmentHandler.Create)
+	n8n.Post("/inbound-messages", conversationHandler.InboundMessage)
+
+	// PATCH/DELETE - Modify endpoints
+	n8n.Patch("/appointments/:id", appointmentHandler.Update)
+	n8n.Delete("/appointments/:id", appointmentHandler.Delete)
+
+	// ═══════════════════════════════════════════════════════════════════════
+	// JWT AUTHENTICATED ROUTES (original routes, unchanged)
+	// ═══════════════════════════════════════════════════════════════════════
+
 	// ── Authenticated group ─────────────────────────────────────────────────
 	auth := server.App.Group("/", middleware.AuthMiddleware(server.TokenMaker))
 
@@ -54,24 +87,6 @@ func SetupRoutes(server *api.Server) error {
 	auth.Post("/user/password_change", userHandler.ChangePassword)
 
 	v1 := auth.Group("/api/v1")
-
-	// ── N8N Integration routes (API Key authentication) ─────────────────────
-	// These routes duplicate some authenticated routes but use X-API-Key instead of JWT.
-	// Rate limited separately (500 req/min vs 200 global).
-	n8nGroup := v1.Group("/integrations", middleware.APIKeyMiddleware(server.Config))
-
-	// Webhook remains public at /api/v1/webhooks/evolution (no change to existing route)
-	// But also available here with API key for consistency
-	n8nGroup.Post("/webhooks/evolution", conversationHandler.EvolutionWebhook)
-
-	// Read-only endpoints (GET)
-	n8nGroup.Get("/services", middleware.RequireTenant("tenant_id"), adminHandler.ListServices)
-	n8nGroup.Get("/providers", middleware.RequireTenant("tenant_id"), adminHandler.ListProviders)
-	n8nGroup.Get("/availability", middleware.RequireTenant("tenant_id"), schedulingHandler.Availability)
-
-	// Write endpoints (POST)
-	n8nGroup.Post("/appointments", appointmentHandler.Create)
-	n8nGroup.Post("/inbound-messages", conversationHandler.InboundMessage)
 
 	// ── Role shortcuts ───────────────────────────────────────────────────────
 	adminOnly := middleware.RequireRole("adminUser")
