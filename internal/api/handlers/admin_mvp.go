@@ -435,6 +435,35 @@ func (h *AdminMVPHandler) DeactivateTenantChannel(c *fiber.Ctx) error {
 	return c.JSON(rsp)
 }
 
+func (h *AdminMVPHandler) UpdateTenantGreeting(c *fiber.Ctx) error {
+	id, err := parseID(c, "id")
+	if err != nil {
+		return response.Error(c, err)
+	}
+
+	var req dto.UpdateTenantGreetingRequest
+	if err := bindAndValidate(c, &req); err != nil {
+		return response.BadRequest(c, err)
+	}
+
+	// Validar permisos: solo adminUser o el tenantUser del mismo tenant puede actualizar
+	payload := getPayload(c)
+	if payload.Role != "adminUser" {
+		if payload.TenantID == nil || *payload.TenantID != id {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error": "forbidden: can only update your own tenant's greeting",
+			})
+		}
+	}
+
+	rsp, err := h.service.UpdateTenantGreeting(c.Context(), id, req.GreetingMessage)
+	if err != nil {
+		return response.Error(c, err)
+	}
+
+	return c.JSON(rsp)
+}
+
 func (h *AdminMVPHandler) getTenant(c *fiber.Ctx, param string) error {
 	id, err := parseID(c, param)
 	if err != nil {

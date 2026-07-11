@@ -12,6 +12,7 @@ type AdminRepository interface {
 	GetTenant(context.Context, uuid.UUID) (db.Tenant, error)
 	CreateTenant(context.Context, db.CreateTenantParams) (db.Tenant, error)
 	UpdateTenant(context.Context, db.UpdateTenantParams) (db.Tenant, error)
+	UpdateTenantGreeting(context.Context, db.UpdateTenantGreetingParams) (db.Tenant, error)
 	DeactivateTenant(context.Context, uuid.UUID) (db.Tenant, error)
 	ListProviders(context.Context, db.ListProvidersParams) ([]db.Provider, int64, error)
 	GetProvider(context.Context, uuid.UUID) (db.Provider, error)
@@ -45,28 +46,51 @@ func (r *adminRepository) ListTenants(ctx context.Context, arg db.ListTenantsPar
 	if err != nil {
 		return nil, 0, err
 	}
-	total, err := r.store.CountTenants(ctx, arg)
-	return items, total, err
+	total, err := r.store.CountTenants(ctx, toCountTenantsParams(arg))
+	return toTenants(items), total, err
 }
 
 func (r *adminRepository) GetTenant(ctx context.Context, id uuid.UUID) (db.Tenant, error) {
-	return r.store.GetTenant(ctx, id)
+	row, err := r.store.GetTenant(ctx, id)
+	if err != nil {
+		return db.Tenant{}, err
+	}
+	return toTenant(row), nil
 }
 func (r *adminRepository) CreateTenant(ctx context.Context, arg db.CreateTenantParams) (db.Tenant, error) {
-	return r.store.CreateTenant(ctx, arg)
+	row, err := r.store.CreateTenant(ctx, arg)
+	if err != nil {
+		return db.Tenant{}, err
+	}
+	return toTenantFromCreate(row), nil
 }
 func (r *adminRepository) UpdateTenant(ctx context.Context, arg db.UpdateTenantParams) (db.Tenant, error) {
-	return r.store.UpdateTenant(ctx, arg)
+	row, err := r.store.UpdateTenant(ctx, arg)
+	if err != nil {
+		return db.Tenant{}, err
+	}
+	return toTenantFromUpdate(row), nil
+}
+func (r *adminRepository) UpdateTenantGreeting(ctx context.Context, arg db.UpdateTenantGreetingParams) (db.Tenant, error) {
+	row, err := r.store.UpdateTenantGreeting(ctx, arg)
+	if err != nil {
+		return db.Tenant{}, err
+	}
+	return toTenantFromUpdateGreeting(row), nil
 }
 func (r *adminRepository) DeactivateTenant(ctx context.Context, id uuid.UUID) (db.Tenant, error) {
-	return r.store.DeactivateTenant(ctx, id)
+	row, err := r.store.DeactivateTenant(ctx, id)
+	if err != nil {
+		return db.Tenant{}, err
+	}
+	return toTenantFromDeactivate(row), nil
 }
 func (r *adminRepository) ListProviders(ctx context.Context, arg db.ListProvidersParams) ([]db.Provider, int64, error) {
 	items, err := r.store.ListProviders(ctx, arg)
 	if err != nil {
 		return nil, 0, err
 	}
-	total, err := r.store.CountProviders(ctx, arg)
+	total, err := r.store.CountProviders(ctx, toCountProvidersParams(arg))
 	return items, total, err
 }
 func (r *adminRepository) GetProvider(ctx context.Context, id uuid.UUID) (db.Provider, error) {
@@ -86,7 +110,7 @@ func (r *adminRepository) ListServices(ctx context.Context, arg db.ListServicesP
 	if err != nil {
 		return nil, 0, err
 	}
-	total, err := r.store.CountServices(ctx, arg)
+	total, err := r.store.CountServices(ctx, toCountServicesParams(arg))
 	return items, total, err
 }
 func (r *adminRepository) GetService(ctx context.Context, id uuid.UUID) (db.Service, error) {
@@ -106,7 +130,7 @@ func (r *adminRepository) ListCustomers(ctx context.Context, arg db.ListCustomer
 	if err != nil {
 		return nil, 0, err
 	}
-	total, err := r.store.CountCustomers(ctx, arg)
+	total, err := r.store.CountCustomers(ctx, toCountCustomersParams(arg))
 	return items, total, err
 }
 func (r *adminRepository) GetCustomer(ctx context.Context, id uuid.UUID) (db.Customer, error) {
@@ -123,7 +147,7 @@ func (r *adminRepository) ListTenantChannels(ctx context.Context, arg db.ListTen
 	if err != nil {
 		return nil, 0, err
 	}
-	total, err := r.store.CountTenantChannels(ctx, arg)
+	total, err := r.store.CountTenantChannels(ctx, toCountTenantChannelsParams(arg))
 	return items, total, err
 }
 func (r *adminRepository) GetTenantChannel(ctx context.Context, id uuid.UUID) (db.TenantChannel, error) {

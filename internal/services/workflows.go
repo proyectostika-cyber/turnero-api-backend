@@ -27,7 +27,8 @@ type ConversationService interface {
 	GetThread(context.Context, uuid.UUID, *uuid.UUID) (dto.ConversationThreadResponse, error)
 	StoreMessage(context.Context, dto.ConversationMessageRequest, *uuid.UUID) (dto.ConversationMessageResponse, error)
 	ProcessInboundMessage(context.Context, dto.InboundMessageRequest) (dto.ConversationMessageResponse, error)
-	ProcessEvolutionWebhook(context.Context, dto.EvolutionWebhookRequest, []byte) error
+	ProcessEvolutionWebhook(context.Context, dto.EvolutionWebhookRequest, []byte) (dto.EvolutionWebhookResponse, error)
+	UpdateConversationState(context.Context, uuid.UUID, dto.UpdateConversationStateRequest) error
 }
 
 type appointmentService struct {
@@ -305,7 +306,7 @@ func (s *conversationService) ProcessInboundMessage(ctx context.Context, req dto
 	return mapMessage(msg), err
 }
 
-func (s *conversationService) ProcessEvolutionWebhook(ctx context.Context, req dto.EvolutionWebhookRequest, raw []byte) error {
+func (s *conversationService) ProcessEvolutionWebhook(ctx context.Context, req dto.EvolutionWebhookRequest, raw []byte) (dto.EvolutionWebhookResponse, error) {
 	// Resolve external_id: prefer nested instance field, fall back to legacy flat field.
 	externalID := req.Instance
 	if externalID == "" {
@@ -322,7 +323,7 @@ func (s *conversationService) ProcessEvolutionWebhook(ctx context.Context, req d
 	}
 
 	if externalID == "" || externalCustomer == "" {
-		return response.ErrInvalidInput
+		return dto.EvolutionWebhookResponse{}, response.ErrInvalidInput
 	}
 
 	// Resolve message text: prefer nested conversation body, then extendedText, then legacy flat field.
@@ -335,16 +336,51 @@ func (s *conversationService) ProcessEvolutionWebhook(ctx context.Context, req d
 	}
 
 	metadata, _ := json.Marshal(req)
-	_, err := s.storeInboundMessage(ctx, inboundMessage{
+	result, err := s.storeInboundMessage(ctx, inboundMessage{
 		ChannelExternalID:  externalID,
 		ExternalCustomerID: externalCustomer,
 		Message:            message,
 		Source:             "evolution",
 		Metadata:           metadata,
 		LogPayload:         raw,
-		State:              "webhook_received",
+		State:              "message_received",
 	})
-	return err
+	if err != nil {
+		return dto.EvolutionWebhookResponse{}, err
+	}
+
+	// Obtener información del tenant
+	tenantRow, err := s.repo.Store().GetTenant(ctx, result.TenantID)
+	if err != nil {
+		return dto.EvolutionWebhookResponse{}, err
+	}
+	tenant := repositories.ToTenant(tenantRow)
+
+	// Obtener estado de conversación actual
+	state, err := s.repo.Store().GetConversationState(ctx, db.GetConversationStateParams{
+		TenantID:   result.TenantID,
+		CustomerID: result.CustomerID,
+	})
+	
+	currentStep := "greeting"
+	stateData := json.RawMessage("{}")
+	if err == nil {
+		currentStep = state.State
+		stateData = json.RawMessage(state.Data)
+	}
+
+	return dto.EvolutionWebhookResponse{
+		Processed:       true,
+		TenantID:        tenant.ID,
+		TenantName:      tenant.Name,
+		GreetingMessage: tenant.GreetingMessage,
+		CustomerID:      result.CustomerID,
+		ConversationState: dto.ConversationStateData{
+			CurrentStep: currentStep,
+			Data:        stateData,
+		},
+		Idempotent: true,
+	}, nil
 }
 
 type inboundMessage struct {
@@ -357,11 +393,17 @@ type inboundMessage struct {
 	State              string
 }
 
+type inboundMessageResult struct {
+	Message    db.ConversationMessage
+	TenantID   uuid.UUID
+	CustomerID uuid.UUID
+}
+
 // storeInboundMessage resolves the tenant channel, finds-or-creates the customer
 // (upsert-safe to handle concurrent webhooks for the same number), and stores
 // the conversation message — all inside a single transaction.
-func (s *conversationService) storeInboundMessage(ctx context.Context, req inboundMessage) (db.ConversationMessage, error) {
-	var out db.ConversationMessage
+func (s *conversationService) storeInboundMessage(ctx context.Context, req inboundMessage) (inboundMessageResult, error) {
+	var out inboundMessageResult
 	if req.ChannelExternalID == "" || req.ExternalCustomerID == "" || req.Message == "" {
 		return out, response.ErrInvalidInput
 	}
@@ -422,8 +464,34 @@ func (s *conversationService) storeInboundMessage(ctx context.Context, req inbou
 			State:      req.State,
 			Data:       req.Metadata,
 		})
-		out = msg
+		out = inboundMessageResult{
+			Message:    msg,
+			TenantID:   channel.TenantID,
+			CustomerID: customer.ID,
+		}
 		return err
 	})
 	return out, err
+}
+
+func (s *conversationService) UpdateConversationState(ctx context.Context, customerID uuid.UUID, req dto.UpdateConversationStateRequest) error {
+	// Obtener customer para obtener tenant_id
+	customer, err := s.repo.GetCustomer(ctx, customerID)
+	if err != nil {
+		return err
+	}
+
+	data := req.Data
+	if len(data) == 0 {
+		data = json.RawMessage("{}")
+	}
+
+	_, err = s.repo.Store().UpsertConversationState(ctx, db.UpsertConversationStateParams{
+		TenantID:   customer.TenantID,
+		CustomerID: customerID,
+		State:      req.CurrentStep,
+		Data:       []byte(data),
+	})
+
+	return err
 }

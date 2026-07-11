@@ -1,5 +1,5 @@
 -- name: ListTenants :many
-SELECT id, name, timezone, active, created_at, updated_at
+SELECT id, name, timezone, active, greeting_message, created_at, updated_at
 FROM tenants
 WHERE ($1::text = '' OR name ILIKE '%' || $1 || '%')
   AND ($2::boolean IS NULL OR active = $2)
@@ -12,26 +12,32 @@ WHERE ($1::text = '' OR name ILIKE '%' || $1 || '%')
   AND ($2::boolean IS NULL OR active = $2);
 
 -- name: GetTenant :one
-SELECT id, name, timezone, active, created_at, updated_at
+SELECT id, name, timezone, active, greeting_message, created_at, updated_at
 FROM tenants
 WHERE id = $1;
 
 -- name: CreateTenant :one
-INSERT INTO tenants (name, timezone)
-VALUES ($1, $2)
-RETURNING id, name, timezone, active, created_at, updated_at;
+INSERT INTO tenants (name, timezone, greeting_message)
+VALUES ($1, $2, COALESCE($3, '¡Hola! ¿Dime en qué puedo ayudarte?'))
+RETURNING id, name, timezone, active, greeting_message, created_at, updated_at;
 
 -- name: UpdateTenant :one
 UPDATE tenants
-SET name = $2, timezone = $3, updated_at = now()
+SET name = $2, timezone = $3, greeting_message = COALESCE($4, greeting_message), updated_at = now()
 WHERE id = $1
-RETURNING id, name, timezone, active, created_at, updated_at;
+RETURNING id, name, timezone, active, greeting_message, created_at, updated_at;
 
 -- name: DeactivateTenant :one
 UPDATE tenants
 SET active = false, updated_at = now()
 WHERE id = $1
-RETURNING id, name, timezone, active, created_at, updated_at;
+RETURNING id, name, timezone, active, greeting_message, created_at, updated_at;
+
+-- name: UpdateTenantGreeting :one
+UPDATE tenants
+SET greeting_message = $2, updated_at = now()
+WHERE id = $1
+RETURNING id, name, timezone, active, greeting_message, created_at, updated_at;
 
 -- name: ListProviders :many
 SELECT id, tenant_id, name, active, created_at, updated_at
@@ -323,9 +329,19 @@ INSERT INTO conversation_messages (thread_id, direction, message, metadata)
 VALUES ($1, $2, $3, $4)
 RETURNING id, thread_id, direction, message, metadata, created_at;
 
+-- name: GetConversationState :one
+SELECT id, tenant_id, customer_id, state, data, updated_at
+FROM conversation_state
+WHERE tenant_id = $1 AND customer_id = $2;
+
 -- name: UpsertConversationState :one
 INSERT INTO conversation_state (tenant_id, customer_id, state, data)
 VALUES ($1, $2, $3, $4)
+ON CONFLICT (tenant_id, customer_id)
+DO UPDATE SET
+    state = EXCLUDED.state,
+    data = EXCLUDED.data,
+    updated_at = NOW()
 RETURNING id, tenant_id, customer_id, state, data, updated_at;
 
 -- name: CreateWebhookLog :one

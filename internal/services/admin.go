@@ -16,6 +16,7 @@ type AdminService interface {
 	GetTenant(context.Context, uuid.UUID) (dto.TenantResponse, error)
 	CreateTenant(context.Context, dto.TenantRequest) (dto.TenantResponse, error)
 	UpdateTenant(context.Context, uuid.UUID, dto.TenantRequest) (dto.TenantResponse, error)
+	UpdateTenantGreeting(context.Context, uuid.UUID, string) (dto.TenantResponse, error)
 	DeactivateTenant(context.Context, uuid.UUID) (dto.TenantResponse, error)
 	ListProviders(context.Context, uuid.UUID, string, *bool, pagination.Page) (pagination.Response[dto.ProviderResponse], error)
 	GetProvider(context.Context, uuid.UUID, *uuid.UUID) (dto.ProviderResponse, error)
@@ -45,7 +46,11 @@ func NewAdminService(repo repositories.AdminRepository) AdminService {
 }
 
 func (s *adminService) ListTenants(ctx context.Context, search string, active *bool, p pagination.Page) (pagination.Response[dto.TenantResponse], error) {
-	items, total, err := s.repo.ListTenants(ctx, db.ListTenantsParams{Search: search, Active: active, Limit: p.PageSize, Offset: p.Offset})
+	activeValue := false
+	if active != nil {
+		activeValue = *active
+	}
+	items, total, err := s.repo.ListTenants(ctx, db.ListTenantsParams{Column1: search, Column2: activeValue, Limit: p.PageSize, Offset: p.Offset})
 	return paged(items, total, p, mapTenant), err
 }
 func (s *adminService) GetTenant(ctx context.Context, id uuid.UUID) (dto.TenantResponse, error) {
@@ -60,12 +65,23 @@ func (s *adminService) UpdateTenant(ctx context.Context, id uuid.UUID, req dto.T
 	item, err := s.repo.UpdateTenant(ctx, db.UpdateTenantParams{ID: id, Name: req.Name, Timezone: req.Timezone})
 	return mapTenant(item), err
 }
+func (s *adminService) UpdateTenantGreeting(ctx context.Context, id uuid.UUID, message string) (dto.TenantResponse, error) {
+	item, err := s.repo.UpdateTenantGreeting(ctx, db.UpdateTenantGreetingParams{
+		ID:              id,
+		GreetingMessage: message,
+	})
+	return mapTenant(item), err
+}
 func (s *adminService) DeactivateTenant(ctx context.Context, id uuid.UUID) (dto.TenantResponse, error) {
 	item, err := s.repo.DeactivateTenant(ctx, id)
 	return mapTenant(item), err
 }
 func (s *adminService) ListProviders(ctx context.Context, tenantID uuid.UUID, search string, active *bool, p pagination.Page) (pagination.Response[dto.ProviderResponse], error) {
-	items, total, err := s.repo.ListProviders(ctx, db.ListProvidersParams{TenantID: tenantID, Search: search, Active: active, Limit: p.PageSize, Offset: p.Offset})
+	activeValue := false
+	if active != nil {
+		activeValue = *active
+	}
+	items, total, err := s.repo.ListProviders(ctx, db.ListProvidersParams{TenantID: tenantID, Column2: search, Column3: activeValue, Limit: p.PageSize, Offset: p.Offset})
 	return paged(items, total, p, mapProvider), err
 }
 func (s *adminService) GetProvider(ctx context.Context, id uuid.UUID, scope *uuid.UUID) (dto.ProviderResponse, error) {
@@ -109,7 +125,11 @@ func (s *adminService) DeactivateProvider(ctx context.Context, id uuid.UUID, sco
 	return mapProvider(item), err
 }
 func (s *adminService) ListServices(ctx context.Context, tenantID uuid.UUID, search string, active *bool, p pagination.Page) (pagination.Response[dto.ServiceResponse], error) {
-	items, total, err := s.repo.ListServices(ctx, db.ListServicesParams{TenantID: tenantID, Search: search, Active: active, Limit: p.PageSize, Offset: p.Offset})
+	activeValue := false
+	if active != nil {
+		activeValue = *active
+	}
+	items, total, err := s.repo.ListServices(ctx, db.ListServicesParams{TenantID: tenantID, Column2: search, Column3: activeValue, Limit: p.PageSize, Offset: p.Offset})
 	return paged(items, total, p, mapService), err
 }
 func (s *adminService) GetService(ctx context.Context, id uuid.UUID, scope *uuid.UUID) (dto.ServiceResponse, error) {
@@ -153,7 +173,7 @@ func (s *adminService) DeactivateService(ctx context.Context, id uuid.UUID, scop
 	return mapService(item), err
 }
 func (s *adminService) ListCustomers(ctx context.Context, tenantID uuid.UUID, search string, p pagination.Page) (pagination.Response[dto.CustomerResponse], error) {
-	items, total, err := s.repo.ListCustomers(ctx, db.ListCustomersParams{TenantID: tenantID, Search: search, Limit: p.PageSize, Offset: p.Offset})
+	items, total, err := s.repo.ListCustomers(ctx, db.ListCustomersParams{TenantID: tenantID, Column2: search, Limit: p.PageSize, Offset: p.Offset})
 	return paged(items, total, p, mapCustomer), err
 }
 func (s *adminService) GetCustomer(ctx context.Context, id uuid.UUID, scope *uuid.UUID) (dto.CustomerResponse, error) {
@@ -184,7 +204,11 @@ func (s *adminService) UpdateCustomer(ctx context.Context, id uuid.UUID, req dto
 	return mapCustomer(item), err
 }
 func (s *adminService) ListTenantChannels(ctx context.Context, tenantID uuid.UUID, channelType string, active *bool, p pagination.Page) (pagination.Response[dto.TenantChannelResponse], error) {
-	items, total, err := s.repo.ListTenantChannels(ctx, db.ListTenantChannelsParams{TenantID: tenantID, ChannelType: channelType, Active: active, Limit: p.PageSize, Offset: p.Offset})
+	activeValue := false
+	if active != nil {
+		activeValue = *active
+	}
+	items, total, err := s.repo.ListTenantChannels(ctx, db.ListTenantChannelsParams{TenantID: tenantID, Column2: channelType, Column3: activeValue, Limit: p.PageSize, Offset: p.Offset})
 	return paged(items, total, p, mapTenantChannel), err
 }
 func (s *adminService) GetTenantChannel(ctx context.Context, id uuid.UUID, scope *uuid.UUID) (dto.TenantChannelResponse, error) {

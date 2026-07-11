@@ -13,12 +13,13 @@ type TenantRequest struct {
 }
 
 type TenantResponse struct {
-	ID        uuid.UUID `json:"id"`
-	Name      string    `json:"name"`
-	Timezone  string    `json:"timezone"`
-	Active    bool      `json:"active"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID              uuid.UUID `json:"id"`
+	Name            string    `json:"name"`
+	Timezone        string    `json:"timezone"`
+	Active          bool      `json:"active"`
+	GreetingMessage string    `json:"greeting_message"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }
 
 type ProviderRequest struct {
@@ -293,4 +294,32 @@ type UserTenantRequest struct {
 
 type UserProviderRequest struct {
 	ProviderID uuid.UUID `json:"provider_id" validate:"required"`
+}
+
+// UpdateTenantGreetingRequest is the request to update tenant greeting message
+type UpdateTenantGreetingRequest struct {
+	GreetingMessage string `json:"greeting_message" validate:"required,min=1,max=500"`
+}
+
+// UpdateConversationStateRequest is the request from n8n to update conversation state
+type UpdateConversationStateRequest struct {
+	CurrentStep string          `json:"current_step" validate:"required"`
+	Data        json.RawMessage `json:"data"`
+}
+
+// EvolutionWebhookResponse is the response for Evolution API webhook processing
+type EvolutionWebhookResponse struct {
+	Processed         bool                    `json:"processed"`
+	TenantID          uuid.UUID               `json:"tenant_id"`
+	TenantName        string                  `json:"tenant_name"`
+	GreetingMessage   string                  `json:"greeting_message"`
+	CustomerID        uuid.UUID               `json:"customer_id"`
+	ConversationState ConversationStateData   `json:"conversation_state"`
+	Idempotent        bool                    `json:"idempotent"`
+}
+
+// ConversationStateData holds current conversation state
+type ConversationStateData struct {
+	CurrentStep string          `json:"current_step"`
+	Data        json.RawMessage `json:"data"`
 }

@@ -35,7 +35,7 @@ func (r *workflowRepository) ListAppointments(ctx context.Context, arg db.ListAp
 	if err != nil {
 		return nil, 0, err
 	}
-	total, err := r.store.CountAppointments(ctx, arg)
+	total, err := r.store.CountAppointments(ctx, toCountAppointmentsParams(arg))
 	return items, total, err
 }
 func (r *workflowRepository) GetAppointment(ctx context.Context, id uuid.UUID) (db.Appointment, error) {

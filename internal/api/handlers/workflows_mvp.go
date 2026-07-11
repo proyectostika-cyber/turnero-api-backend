@@ -187,8 +187,30 @@ func (h *ConversationMVPHandler) EvolutionWebhook(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return response.BadRequest(c, err)
 	}
-	if err := h.service.ProcessEvolutionWebhook(c.Context(), req, c.Body()); err != nil {
+	result, err := h.service.ProcessEvolutionWebhook(c.Context(), req, c.Body())
+	if err != nil {
 		return response.Error(c, err)
 	}
-	return c.SendStatus(fiber.StatusAccepted)
+	return c.Status(fiber.StatusOK).JSON(result)
+}
+
+func (h *ConversationMVPHandler) UpdateConversationState(c *fiber.Ctx) error {
+	customerID, err := parseID(c, "customer_id")
+	if err != nil {
+		return response.Error(c, err)
+	}
+
+	var req dto.UpdateConversationStateRequest
+	if err := bindAndValidate(c, &req); err != nil {
+		return response.BadRequest(c, err)
+	}
+
+	err = h.service.UpdateConversationState(c.Context(), customerID, req)
+	if err != nil {
+		return response.Error(c, err)
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "conversation state updated",
+	})
 }

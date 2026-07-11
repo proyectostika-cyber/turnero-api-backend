@@ -70,6 +70,9 @@ func SetupRoutes(server *api.Server) error {
 	n8n.Post("/appointments", appointmentHandler.Create)
 	n8n.Post("/inbound-messages", conversationHandler.InboundMessage)
 
+	// PUT - Update endpoints
+	n8n.Put("/conversation-state/:customer_id", conversationHandler.UpdateConversationState)
+
 	// PATCH/DELETE - Modify endpoints
 	n8n.Patch("/appointments/:id", appointmentHandler.Update)
 	n8n.Delete("/appointments/:id", appointmentHandler.Delete)
@@ -97,6 +100,7 @@ func SetupRoutes(server *api.Server) error {
 	v1.Post("/tenants", adminOnly, adminHandler.CreateTenant)
 	v1.Get("/tenants/:id", adminOnly, adminHandler.GetTenant)
 	v1.Put("/tenants/:id", adminOnly, adminHandler.UpdateTenant)
+	v1.Put("/tenants/:id/greeting", adminOrTenant, adminHandler.UpdateTenantGreeting)
 	v1.Delete("/tenants/:id", adminOnly, adminHandler.DeactivateTenant)
 
 	// ── User management ──────────────────────────────────────────────────────

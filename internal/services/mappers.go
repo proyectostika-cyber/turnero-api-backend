@@ -10,7 +10,15 @@ import (
 )
 
 func mapTenant(v db.Tenant) dto.TenantResponse {
-	return dto.TenantResponse(v)
+	return dto.TenantResponse{
+		ID:              v.ID,
+		Name:            v.Name,
+		Timezone:        v.Timezone,
+		Active:          v.Active,
+		GreetingMessage: v.GreetingMessage,
+		CreatedAt:       v.CreatedAt,
+		UpdatedAt:       v.UpdatedAt,
+	}
 }
 
 func mapProvider(v db.Provider) dto.ProviderResponse {
