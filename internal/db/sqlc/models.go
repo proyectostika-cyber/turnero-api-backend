@@ -57,18 +57,18 @@ func (ns NullUserRole) Value() (driver.Value, error) {
 }
 
 type Appointment struct {
-	ID         uuid.UUID   `json:"id"`
-	TenantID   uuid.UUID   `json:"tenant_id"`
-	CustomerID uuid.UUID   `json:"customer_id"`
-	ProviderID uuid.UUID   `json:"provider_id"`
-	ServiceID  uuid.UUID   `json:"service_id"`
-	SlotID     pgtype.UUID `json:"slot_id"`
-	StartAt    time.Time   `json:"start_at"`
-	EndAt      time.Time   `json:"end_at"`
-	Status     string      `json:"status"`
-	Notes      pgtype.Text `json:"notes"`
-	CreatedAt  time.Time   `json:"created_at"`
-	UpdatedAt  time.Time   `json:"updated_at"`
+	ID         uuid.UUID     `json:"id"`
+	TenantID   uuid.UUID     `json:"tenant_id"`
+	CustomerID uuid.UUID     `json:"customer_id"`
+	ProviderID uuid.UUID     `json:"provider_id"`
+	ServiceID  uuid.UUID     `json:"service_id"`
+	SlotID     uuid.NullUUID `json:"slot_id"`
+	StartAt    time.Time     `json:"start_at"`
+	EndAt      time.Time     `json:"end_at"`
+	Status     string        `json:"status"`
+	Notes      pgtype.Text   `json:"notes"`
+	CreatedAt  time.Time     `json:"created_at"`
+	UpdatedAt  time.Time     `json:"updated_at"`
 }
 
 type AppointmentEvent struct {
@@ -80,14 +80,14 @@ type AppointmentEvent struct {
 }
 
 type AppointmentSlot struct {
-	ID            uuid.UUID   `json:"id"`
-	TenantID      uuid.UUID   `json:"tenant_id"`
-	ProviderID    uuid.UUID   `json:"provider_id"`
-	StartAt       time.Time   `json:"start_at"`
-	EndAt         time.Time   `json:"end_at"`
-	Status        string      `json:"status"`
-	AppointmentID pgtype.UUID `json:"appointment_id"`
-	CreatedAt     time.Time   `json:"created_at"`
+	ID            uuid.UUID     `json:"id"`
+	TenantID      uuid.UUID     `json:"tenant_id"`
+	ProviderID    uuid.UUID     `json:"provider_id"`
+	StartAt       time.Time     `json:"start_at"`
+	EndAt         time.Time     `json:"end_at"`
+	Status        string        `json:"status"`
+	AppointmentID uuid.NullUUID `json:"appointment_id"`
+	CreatedAt     time.Time     `json:"created_at"`
 }
 
 type ConversationMessage struct {
@@ -134,13 +134,13 @@ type CustomerChannel struct {
 }
 
 type OutboundMessage struct {
-	ID         uuid.UUID   `json:"id"`
-	TenantID   uuid.UUID   `json:"tenant_id"`
-	CustomerID pgtype.UUID `json:"customer_id"`
-	ChannelID  pgtype.UUID `json:"channel_id"`
-	Message    string      `json:"message"`
-	Status     string      `json:"status"`
-	CreatedAt  time.Time   `json:"created_at"`
+	ID         uuid.UUID     `json:"id"`
+	TenantID   uuid.UUID     `json:"tenant_id"`
+	CustomerID uuid.NullUUID `json:"customer_id"`
+	ChannelID  uuid.NullUUID `json:"channel_id"`
+	Message    string        `json:"message"`
+	Status     string        `json:"status"`
+	CreatedAt  time.Time     `json:"created_at"`
 }
 
 type Provider struct {
@@ -153,11 +153,11 @@ type Provider struct {
 }
 
 type ProviderAvailability struct {
-	ID         uuid.UUID   `json:"id"`
-	ProviderID uuid.UUID   `json:"provider_id"`
-	Weekday    int16       `json:"weekday"`
-	StartTime  pgtype.Time `json:"start_time"`
-	EndTime    pgtype.Time `json:"end_time"`
+	ID         uuid.UUID `json:"id"`
+	ProviderID uuid.UUID `json:"provider_id"`
+	Weekday    int16     `json:"weekday"`
+	StartTime  string    `json:"start_time"`
+	EndTime    string    `json:"end_time"`
 }
 
 type ProviderException struct {
@@ -227,14 +227,14 @@ type TenantUser struct {
 }
 
 type User struct {
-	ID                int32       `json:"id"`
-	Username          string      `json:"username"`
-	HashedPassword    string      `json:"hashed_password"`
-	FullName          string      `json:"full_name"`
-	PasswordChangedAt time.Time   `json:"password_changed_at"`
-	CreatedAt         time.Time   `json:"created_at"`
-	Role              UserRole    `json:"role"`
-	TenantID          pgtype.UUID `json:"tenant_id"`
+	ID                int32         `json:"id"`
+	Username          string        `json:"username"`
+	HashedPassword    string        `json:"hashed_password"`
+	FullName          string        `json:"full_name"`
+	PasswordChangedAt time.Time     `json:"password_changed_at"`
+	CreatedAt         time.Time     `json:"created_at"`
+	Role              UserRole      `json:"role"`
+	TenantID          uuid.NullUUID `json:"tenant_id"`
 }
 
 type UserProvider struct {
@@ -244,9 +244,9 @@ type UserProvider struct {
 }
 
 type WebhookLog struct {
-	ID        uuid.UUID   `json:"id"`
-	TenantID  pgtype.UUID `json:"tenant_id"`
-	Source    string      `json:"source"`
-	Payload   []byte      `json:"payload"`
-	CreatedAt time.Time   `json:"created_at"`
+	ID        uuid.UUID     `json:"id"`
+	TenantID  uuid.NullUUID `json:"tenant_id"`
+	Source    string        `json:"source"`
+	Payload   []byte        `json:"payload"`
+	CreatedAt time.Time     `json:"created_at"`
 }

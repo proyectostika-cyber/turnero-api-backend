@@ -2,12 +2,10 @@ package services
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/unknowncode44/appointments/internal/api/dto"
 	"github.com/unknowncode44/appointments/internal/api/response"
 	db "github.com/unknowncode44/appointments/internal/db/sqlc"
@@ -60,15 +58,11 @@ func (s *schedulingService) CreateAvailability(ctx context.Context, providerID u
 		return dto.AvailabilityResponse{}, response.ErrInvalidInput
 	}
 	
-	// Convert string "HH:MM" to pgtype.Time (microseconds since midnight)
-	startTime := stringToPgTime(req.StartTime)
-	endTime := stringToPgTime(req.EndTime)
-	
 	item, err := s.repo.CreateAvailability(ctx, db.CreateProviderAvailabilityParams{
 		ProviderID: providerID,
 		Weekday:    req.Weekday,
-		StartTime:  startTime,
-		EndTime:    endTime,
+		StartTime:  req.StartTime,
+		EndTime:    req.EndTime,
 	})
 	return mapAvailability(item), err
 }
@@ -165,12 +159,8 @@ func (s *schedulingService) GenerateSlots(ctx context.Context, req dto.SlotGener
 				continue
 			}
 			
-			// Convert pgtype.Time to string HH:MM:SS
-			startTimeStr := pgTimeToString(av.StartTime)
-			endTimeStr := pgTimeToString(av.EndTime)
-			
-			cursor := combineInLoc(day, startTimeStr, loc)
-			periodEnd := combineInLoc(day, endTimeStr, loc)
+			cursor := combineInLoc(day, av.StartTime, loc)
+			periodEnd := combineInLoc(day, av.EndTime, loc)
 			for cursor.Add(time.Duration(slotMinutes)*time.Minute).Compare(periodEnd) <= 0 {
 				slotEnd := cursor.Add(time.Duration(slotMinutes) * time.Minute)
 				if !overlapsAny(cursor, slotEnd, exceptions) {
@@ -203,14 +193,24 @@ func (s *schedulingService) ListAvailableSlots(ctx context.Context, tenantID uui
 	if err != nil {
 		return nil, response.ErrInvalidInput
 	}
+	// Handle optional UUID pointers
+	providerIDValue := uuid.Nil
+	if providerID != nil {
+		providerIDValue = *providerID
+	}
+	serviceIDValue := uuid.Nil
+	if serviceID != nil {
+		serviceIDValue = *serviceID
+	}
+	
 	items, err := s.repo.ListAvailableSlots(ctx, db.ListAvailableSlotsParams{
-		TenantID:   tenantID,
-		ProviderID: providerID,
-		ServiceID:  serviceID,
-		StartAt:    start,
-		EndAt:      end,
-		Limit:      p.PageSize,
-		Offset:     p.Offset,
+		TenantID:  tenantID,
+		Column2:   providerIDValue,
+		StartAt:   start,
+		StartAt_2: end,
+		Column5:   serviceIDValue,
+		Limit:     p.PageSize,
+		Offset:    p.Offset,
 	})
 	return mapSlice(items, mapSlot), err
 }
@@ -260,27 +260,3 @@ func mapSlice[I any, O any](items []I, mapper func(I) O) []O {
 
 // pgxErrNoRows shadows the pgx import for internal use.
 var _ = pgx.ErrNoRows
-
-// stringToPgTime converts "HH:MM" or "HH:MM:SS" string to pgtype.Time (microseconds since midnight)
-func stringToPgTime(s string) pgtype.Time {
-	t, err := time.Parse("15:04", s)
-	if err != nil {
-		// Try with seconds
-		t, err = time.Parse("15:04:05", s)
-		if err != nil {
-			return pgtype.Time{Valid: false}
-		}
-	}
-	
-	hours := t.Hour()
-	minutes := t.Minute()
-	seconds := t.Second()
-	
-	totalSeconds := int64(hours*3600 + minutes*60 + seconds)
-	microseconds := totalSeconds * 1_000_000
-	
-	return pgtype.Time{
-		Microseconds: microseconds,
-		Valid:        true,
-	}
-}

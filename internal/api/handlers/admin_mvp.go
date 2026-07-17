@@ -4,6 +4,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/unknowncode44/appointments/internal/api/dto"
+	"github.com/unknowncode44/appointments/internal/api/middleware"
 	"github.com/unknowncode44/appointments/internal/api/response"
 	"github.com/unknowncode44/appointments/internal/platform/pagination"
 	"github.com/unknowncode44/appointments/internal/services"
@@ -447,7 +448,7 @@ func (h *AdminMVPHandler) UpdateTenantGreeting(c *fiber.Ctx) error {
 	}
 
 	// Validar permisos: solo adminUser o el tenantUser del mismo tenant puede actualizar
-	payload := getPayload(c)
+	payload, _ := middleware.ExtractUserFromContext(c)
 	if payload.Role != "adminUser" {
 		if payload.TenantID == nil || *payload.TenantID != id {
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{

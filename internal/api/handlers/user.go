@@ -116,11 +116,17 @@ func (h *UserHandler) LoginUser(c *fiber.Ctx) error {
 	if err = util.CheckPassword(req.Password, user.HashedPassword); err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "invalid credentials"})
 	}
-	accessToken, accessPayload, err := h.tokenMaker.CreateToken(user.Username, string(user.Role), user.ID, user.TenantID, h.Config.AccessTokenDuration)
+	// Convert uuid.NullUUID to *uuid.UUID
+	var tenantIDPtr *uuid.UUID
+	if user.TenantID.Valid {
+		tenantIDPtr = &user.TenantID.UUID
+	}
+	
+	accessToken, accessPayload, err := h.tokenMaker.CreateToken(user.Username, string(user.Role), user.ID, tenantIDPtr, h.Config.AccessTokenDuration)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "could not create token"})
 	}
-	refreshToken, refreshPayload, err := h.tokenMaker.CreateToken(user.Username, string(user.Role), user.ID, user.TenantID, h.Config.RefreshTokenDuration)
+	refreshToken, refreshPayload, err := h.tokenMaker.CreateToken(user.Username, string(user.Role), user.ID, tenantIDPtr, h.Config.RefreshTokenDuration)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "could not create refresh token"})
 	}
@@ -227,7 +233,7 @@ func (h *UserHandler) ListUsers(c *fiber.Ctx) error {
 			Username:  u.Username,
 			FullName:  u.FullName,
 			Role:      string(u.Role),
-			TenantID:  u.TenantID,
+			TenantID:  nullUUIDToPtr(u.TenantID),
 			CreatedAt: u.CreatedAt,
 		})
 	}
@@ -248,7 +254,7 @@ func (h *UserHandler) GetUserByID(c *fiber.Ctx) error {
 		Username:  user.Username,
 		FullName:  user.FullName,
 		Role:      string(user.Role),
-		TenantID:  user.TenantID,
+		TenantID:  nullUUIDToPtr(user.TenantID),
 		CreatedAt: user.CreatedAt,
 	})
 }
@@ -290,7 +296,7 @@ func (h *UserHandler) CreateUserAdmin(c *fiber.Ctx) error {
 		HashedPassword: hashedPassword,
 		FullName:       req.FullName,
 		Role:           db.UserRole(req.Role),
-		TenantID:       req.TenantID,
+		TenantID:       ptrToNullUUID(req.TenantID),
 	})
 	if err != nil {
 		if db.ErrorCode(err) == db.UniqueViolation {
@@ -303,7 +309,7 @@ func (h *UserHandler) CreateUserAdmin(c *fiber.Ctx) error {
 		Username:  user.Username,
 		FullName:  user.FullName,
 		Role:      string(user.Role),
-		TenantID:  user.TenantID,
+		TenantID:  nullUUIDToPtr(user.TenantID),
 		CreatedAt: user.CreatedAt,
 	})
 }
@@ -320,7 +326,7 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 	user, err := h.Store.UpdateUserRole(c.Context(), db.UpdateUserRoleParams{
 		ID:       int32(id),
 		Role:     db.UserRole(req.Role),
-		TenantID: req.TenantID,
+		TenantID: ptrToNullUUID(req.TenantID),
 	})
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "could not update user"})
@@ -330,7 +336,7 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 		Username:  user.Username,
 		FullName:  user.FullName,
 		Role:      string(user.Role),
-		TenantID:  user.TenantID,
+		TenantID:  nullUUIDToPtr(user.TenantID),
 		CreatedAt: user.CreatedAt,
 	})
 }
@@ -360,7 +366,7 @@ func (h *UserHandler) LinkUserToTenant(c *fiber.Ctx) error {
 	}
 	user, err := h.Store.UpdateUserTenant(c.Context(), db.UpdateUserTenantParams{
 		ID:       int32(id),
-		TenantID: &req.TenantID,
+		TenantID: ptrToNullUUID(&req.TenantID),
 	})
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "could not link user to tenant"})
@@ -370,7 +376,7 @@ func (h *UserHandler) LinkUserToTenant(c *fiber.Ctx) error {
 		Username:  user.Username,
 		FullName:  user.FullName,
 		Role:      string(user.Role),
-		TenantID:  user.TenantID,
+		TenantID:  nullUUIDToPtr(user.TenantID),
 		CreatedAt: user.CreatedAt,
 	})
 }
@@ -424,4 +430,19 @@ func (h *UserHandler) GetUserProviders(c *fiber.Ctx) error {
 		return response.Error(c, err)
 	}
 	return c.Status(fiber.StatusOK).JSON(providers)
+}
+
+// Helper functions for uuid.NullUUID conversions
+func nullUUIDToPtr(n uuid.NullUUID) *uuid.UUID {
+	if n.Valid {
+		return &n.UUID
+	}
+	return nil
+}
+
+func ptrToNullUUID(p *uuid.UUID) uuid.NullUUID {
+	if p != nil {
+		return uuid.NullUUID{UUID: *p, Valid: true}
+	}
+	return uuid.NullUUID{Valid: false}
 }

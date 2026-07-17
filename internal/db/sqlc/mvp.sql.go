@@ -171,15 +171,15 @@ RETURNING id, tenant_id, customer_id, provider_id, service_id, slot_id, start_at
 `
 
 type CreateAppointmentParams struct {
-	TenantID   uuid.UUID   `json:"tenant_id"`
-	CustomerID uuid.UUID   `json:"customer_id"`
-	ProviderID uuid.UUID   `json:"provider_id"`
-	ServiceID  uuid.UUID   `json:"service_id"`
-	SlotID     pgtype.UUID `json:"slot_id"`
-	StartAt    time.Time   `json:"start_at"`
-	EndAt      time.Time   `json:"end_at"`
-	Status     string      `json:"status"`
-	Notes      pgtype.Text `json:"notes"`
+	TenantID   uuid.UUID     `json:"tenant_id"`
+	CustomerID uuid.UUID     `json:"customer_id"`
+	ProviderID uuid.UUID     `json:"provider_id"`
+	ServiceID  uuid.UUID     `json:"service_id"`
+	SlotID     uuid.NullUUID `json:"slot_id"`
+	StartAt    time.Time     `json:"start_at"`
+	EndAt      time.Time     `json:"end_at"`
+	Status     string        `json:"status"`
+	Notes      pgtype.Text   `json:"notes"`
 }
 
 func (q *Queries) CreateAppointment(ctx context.Context, arg CreateAppointmentParams) (Appointment, error) {
@@ -420,10 +420,10 @@ RETURNING id, provider_id, weekday, start_time, end_time
 `
 
 type CreateProviderAvailabilityParams struct {
-	ProviderID uuid.UUID   `json:"provider_id"`
-	Weekday    int16       `json:"weekday"`
-	StartTime  pgtype.Time `json:"start_time"`
-	EndTime    pgtype.Time `json:"end_time"`
+	ProviderID uuid.UUID `json:"provider_id"`
+	Weekday    int16     `json:"weekday"`
+	StartTime  string    `json:"start_time"`
+	EndTime    string    `json:"end_time"`
 }
 
 func (q *Queries) CreateProviderAvailability(ctx context.Context, arg CreateProviderAvailabilityParams) (ProviderAvailability, error) {
@@ -580,9 +580,9 @@ RETURNING id, tenant_id, source, payload, created_at
 `
 
 type CreateWebhookLogParams struct {
-	TenantID pgtype.UUID `json:"tenant_id"`
-	Source   string      `json:"source"`
-	Payload  []byte      `json:"payload"`
+	TenantID uuid.NullUUID `json:"tenant_id"`
+	Source   string        `json:"source"`
+	Payload  []byte        `json:"payload"`
 }
 
 func (q *Queries) CreateWebhookLog(ctx context.Context, arg CreateWebhookLogParams) (WebhookLog, error) {
@@ -1571,8 +1571,8 @@ RETURNING id, tenant_id, provider_id, start_at, end_at, status, appointment_id, 
 `
 
 type ReserveAppointmentSlotParams struct {
-	ID            uuid.UUID   `json:"id"`
-	AppointmentID pgtype.UUID `json:"appointment_id"`
+	ID            uuid.UUID     `json:"id"`
+	AppointmentID uuid.NullUUID `json:"appointment_id"`
 }
 
 func (q *Queries) ReserveAppointmentSlot(ctx context.Context, arg ReserveAppointmentSlotParams) (AppointmentSlot, error) {
@@ -1599,14 +1599,14 @@ RETURNING id, tenant_id, customer_id, provider_id, service_id, slot_id, start_at
 `
 
 type UpdateAppointmentParams struct {
-	ID         uuid.UUID   `json:"id"`
-	ProviderID uuid.UUID   `json:"provider_id"`
-	ServiceID  uuid.UUID   `json:"service_id"`
-	SlotID     pgtype.UUID `json:"slot_id"`
-	StartAt    time.Time   `json:"start_at"`
-	EndAt      time.Time   `json:"end_at"`
-	Status     string      `json:"status"`
-	Notes      pgtype.Text `json:"notes"`
+	ID         uuid.UUID     `json:"id"`
+	ProviderID uuid.UUID     `json:"provider_id"`
+	ServiceID  uuid.UUID     `json:"service_id"`
+	SlotID     uuid.NullUUID `json:"slot_id"`
+	StartAt    time.Time     `json:"start_at"`
+	EndAt      time.Time     `json:"end_at"`
+	Status     string        `json:"status"`
+	Notes      pgtype.Text   `json:"notes"`
 }
 
 func (q *Queries) UpdateAppointment(ctx context.Context, arg UpdateAppointmentParams) (Appointment, error) {

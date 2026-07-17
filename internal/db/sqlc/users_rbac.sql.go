@@ -9,7 +9,6 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const addUserProvider = `-- name: AddUserProvider :exec
@@ -41,11 +40,11 @@ INSERT INTO users (
 `
 
 type CreateUserWithRoleParams struct {
-	Username       string      `json:"username"`
-	HashedPassword string      `json:"hashed_password"`
-	FullName       string      `json:"full_name"`
-	Role           UserRole    `json:"role"`
-	TenantID       pgtype.UUID `json:"tenant_id"`
+	Username       string        `json:"username"`
+	HashedPassword string        `json:"hashed_password"`
+	FullName       string        `json:"full_name"`
+	Role           UserRole      `json:"role"`
+	TenantID       uuid.NullUUID `json:"tenant_id"`
 }
 
 func (q *Queries) CreateUserWithRole(ctx context.Context, arg CreateUserWithRoleParams) (User, error) {
@@ -211,9 +210,9 @@ RETURNING id, username, hashed_password, full_name, password_changed_at, created
 `
 
 type UpdateUserRoleParams struct {
-	ID       int32       `json:"id"`
-	Role     UserRole    `json:"role"`
-	TenantID pgtype.UUID `json:"tenant_id"`
+	ID       int32         `json:"id"`
+	Role     UserRole      `json:"role"`
+	TenantID uuid.NullUUID `json:"tenant_id"`
 }
 
 func (q *Queries) UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) (User, error) {
@@ -240,8 +239,8 @@ RETURNING id, username, hashed_password, full_name, password_changed_at, created
 `
 
 type UpdateUserTenantParams struct {
-	ID       int32       `json:"id"`
-	TenantID pgtype.UUID `json:"tenant_id"`
+	ID       int32         `json:"id"`
+	TenantID uuid.NullUUID `json:"tenant_id"`
 }
 
 func (q *Queries) UpdateUserTenant(ctx context.Context, arg UpdateUserTenantParams) (User, error) {

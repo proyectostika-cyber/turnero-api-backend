@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -76,7 +77,10 @@ func (s *appointmentService) Create(ctx context.Context, req dto.AppointmentCrea
 		if err != nil {
 			return err
 		}
-		if _, err := q.ReserveAppointmentSlot(ctx, db.ReserveAppointmentSlotParams{ID: slot.ID, AppointmentID: appt.ID}); err != nil {
+		if _, err := q.ReserveAppointmentSlot(ctx, db.ReserveAppointmentSlotParams{
+			ID:            slot.ID,
+			AppointmentID: uuid.NullUUID{UUID: appt.ID, Valid: true},
+		}); err != nil {
 			return err
 		}
 		if _, err := q.CreateAppointmentEvent(ctx, db.CreateAppointmentEventParams{AppointmentID: appt.ID, EventType: "created", Payload: []byte(`{}`)}); err != nil {
@@ -92,13 +96,23 @@ func (s *appointmentService) Create(ctx context.Context, req dto.AppointmentCrea
 }
 
 func (s *appointmentService) List(ctx context.Context, tenantID uuid.UUID, providerID *uuid.UUID, customerID *uuid.UUID, status string, p pagination.Page) (pagination.Response[dto.AppointmentResponse], error) {
+	// Handle optional UUID pointers - use zero UUID if nil
+	providerIDValue := uuid.Nil
+	if providerID != nil {
+		providerIDValue = *providerID
+	}
+	customerIDValue := uuid.Nil
+	if customerID != nil {
+		customerIDValue = *customerID
+	}
+	
 	items, total, err := s.repo.ListAppointments(ctx, db.ListAppointmentsParams{
-		TenantID:   tenantID,
-		ProviderID: providerID,
-		CustomerID: customerID,
-		Status:     status,
-		Limit:      p.PageSize,
-		Offset:     p.Offset,
+		TenantID: tenantID,
+		Column2:  providerIDValue,
+		Column3:  customerIDValue,
+		Column4:  status,
+		Limit:    p.PageSize,
+		Offset:   p.Offset,
 	})
 	return paged(items, total, p, mapAppointment), err
 }
@@ -171,7 +185,10 @@ func (s *appointmentService) Update(ctx context.Context, id uuid.UUID, req dto.A
 			return err
 		}
 		if req.SlotID != nil {
-			if _, err := q.ReserveAppointmentSlot(ctx, db.ReserveAppointmentSlotParams{ID: *req.SlotID, AppointmentID: id}); err != nil {
+			if _, err := q.ReserveAppointmentSlot(ctx, db.ReserveAppointmentSlotParams{
+				ID:            *req.SlotID,
+				AppointmentID: uuid.NullUUID{UUID: id, Valid: true},
+			}); err != nil {
 				return err
 			}
 		}
@@ -257,7 +274,7 @@ func (s *conversationService) StoreMessage(ctx context.Context, req dto.Conversa
 	}
 	var out db.ConversationMessage
 	err := s.repo.Store().ExecTx(ctx, func(q *db.Queries) error {
-		thread, err := q.GetConversationThreadByCustomer(ctx, db.CreateConversationThreadParams{TenantID: req.TenantID, CustomerID: req.CustomerID})
+		thread, err := q.GetConversationThreadByCustomer(ctx, db.GetConversationThreadByCustomerParams{TenantID: req.TenantID, CustomerID: req.CustomerID})
 		if errors.Is(err, pgx.ErrNoRows) {
 			thread, err = q.CreateConversationThread(ctx, db.CreateConversationThreadParams{TenantID: req.TenantID, CustomerID: req.CustomerID})
 		}
@@ -303,7 +320,7 @@ func (s *conversationService) ProcessInboundMessage(ctx context.Context, req dto
 		LogPayload:         metadata,
 		State:              "inbound_message_received",
 	})
-	return mapMessage(msg), err
+	return mapMessage(msg.Message), err
 }
 
 func (s *conversationService) ProcessEvolutionWebhook(ctx context.Context, req dto.EvolutionWebhookRequest, raw []byte) (dto.EvolutionWebhookResponse, error) {
@@ -440,9 +457,22 @@ func (s *conversationService) storeInboundMessage(ctx context.Context, req inbou
 			return err
 		}
 
-		thread, err := q.GetConversationThreadByCustomer(ctx, db.CreateConversationThreadParams{TenantID: channel.TenantID, CustomerID: customer.ID})
+		customerID, ok := customer.ID.(uuid.UUID)
+		if !ok {
+			// Try converting from []byte if necessary
+			if idBytes, ok := customer.ID.([]byte); ok {
+				customerID, err = uuid.FromBytes(idBytes)
+				if err != nil {
+					return err
+				}
+			} else {
+				return fmt.Errorf("unexpected customer ID type: %T", customer.ID)
+			}
+		}
+		
+		thread, err := q.GetConversationThreadByCustomer(ctx, db.GetConversationThreadByCustomerParams{TenantID: channel.TenantID, CustomerID: customerID})
 		if errors.Is(err, pgx.ErrNoRows) {
-			thread, err = q.CreateConversationThread(ctx, db.CreateConversationThreadParams{TenantID: channel.TenantID, CustomerID: customer.ID})
+			thread, err = q.CreateConversationThread(ctx, db.CreateConversationThreadParams{TenantID: channel.TenantID, CustomerID: customerID})
 		}
 		if err != nil {
 			return err
@@ -460,14 +490,14 @@ func (s *conversationService) storeInboundMessage(ctx context.Context, req inbou
 
 		_, err = q.UpsertConversationState(ctx, db.UpsertConversationStateParams{
 			TenantID:   channel.TenantID,
-			CustomerID: customer.ID,
+			CustomerID: customerID,
 			State:      req.State,
 			Data:       req.Metadata,
 		})
 		out = inboundMessageResult{
 			Message:    msg,
 			TenantID:   channel.TenantID,
-			CustomerID: customer.ID,
+			CustomerID: customerID,
 		}
 		return err
 	})

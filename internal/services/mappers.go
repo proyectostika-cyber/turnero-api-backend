@@ -2,10 +2,8 @@ package services
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/unknowncode44/appointments/internal/api/dto"
 	db "github.com/unknowncode44/appointments/internal/db/sqlc"
 	"github.com/unknowncode44/appointments/internal/repositories"
@@ -56,29 +54,13 @@ func mapTenantChannel(v db.TenantChannel) dto.TenantChannelResponse {
 }
 
 func mapAvailability(v db.ProviderAvailability) dto.AvailabilityResponse {
-	// Convert pgtype.Time (microseconds since midnight) to string HH:MM:SS
-	startTime := pgTimeToString(v.StartTime)
-	endTime := pgTimeToString(v.EndTime)
-	
 	return dto.AvailabilityResponse{
 		ID:         v.ID,
 		ProviderID: v.ProviderID,
 		Weekday:    v.Weekday,
-		StartTime:  startTime,
-		EndTime:    endTime,
+		StartTime:  v.StartTime,
+		EndTime:    v.EndTime,
 	}
-}
-
-// pgTimeToString converts pgtype.Time (microseconds since midnight) to HH:MM:SS string
-func pgTimeToString(t pgtype.Time) string {
-	if !t.Valid {
-		return ""
-	}
-	seconds := t.Microseconds / 1_000_000
-	hours := seconds / 3600
-	minutes := (seconds % 3600) / 60
-	secs := seconds % 60
-	return fmt.Sprintf("%02d:%02d:%02d", hours, minutes, secs)
 }
 
 func mapException(v db.ProviderException) dto.ExceptionResponse {
@@ -95,9 +77,7 @@ func mapException(v db.ProviderException) dto.ExceptionResponse {
 func mapSlot(v db.AppointmentSlot) dto.SlotResponse {
 	var appointmentID *uuid.UUID
 	if v.AppointmentID.Valid {
-		id := v.AppointmentID.Bytes
-		parsedID, _ := uuid.FromBytes(id[:])
-		appointmentID = &parsedID
+		appointmentID = &v.AppointmentID.UUID
 	}
 	return dto.SlotResponse{
 		ID:            v.ID,
@@ -114,9 +94,7 @@ func mapSlot(v db.AppointmentSlot) dto.SlotResponse {
 func mapAppointment(v db.Appointment) dto.AppointmentResponse {
 	var slotID *uuid.UUID
 	if v.SlotID.Valid {
-		id := v.SlotID.Bytes
-		parsedID, _ := uuid.FromBytes(id[:])
-		slotID = &parsedID
+		slotID = &v.SlotID.UUID
 	}
 	return dto.AppointmentResponse{
 		ID:         v.ID,
