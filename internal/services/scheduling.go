@@ -2,10 +2,12 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/unknowncode44/appointments/internal/api/dto"
 	"github.com/unknowncode44/appointments/internal/api/response"
 	db "github.com/unknowncode44/appointments/internal/db/sqlc"
@@ -57,11 +59,16 @@ func (s *schedulingService) CreateAvailability(ctx context.Context, providerID u
 	if _, err := time.Parse("15:04", req.EndTime); err != nil {
 		return dto.AvailabilityResponse{}, response.ErrInvalidInput
 	}
+	
+	// Convert string "HH:MM" to pgtype.Time (microseconds since midnight)
+	startTime := stringToPgTime(req.StartTime)
+	endTime := stringToPgTime(req.EndTime)
+	
 	item, err := s.repo.CreateAvailability(ctx, db.CreateProviderAvailabilityParams{
 		ProviderID: providerID,
 		Weekday:    req.Weekday,
-		StartTime:  req.StartTime,
-		EndTime:    req.EndTime,
+		StartTime:  startTime,
+		EndTime:    endTime,
 	})
 	return mapAvailability(item), err
 }
@@ -157,8 +164,13 @@ func (s *schedulingService) GenerateSlots(ctx context.Context, req dto.SlotGener
 			if int(av.Weekday) != int(day.Weekday()) {
 				continue
 			}
-			cursor := combineInLoc(day, av.StartTime.Format("15:04:05"), loc)
-			periodEnd := combineInLoc(day, av.EndTime.Format("15:04:05"), loc)
+			
+			// Convert pgtype.Time to string HH:MM:SS
+			startTimeStr := pgTimeToString(av.StartTime)
+			endTimeStr := pgTimeToString(av.EndTime)
+			
+			cursor := combineInLoc(day, startTimeStr, loc)
+			periodEnd := combineInLoc(day, endTimeStr, loc)
 			for cursor.Add(time.Duration(slotMinutes)*time.Minute).Compare(periodEnd) <= 0 {
 				slotEnd := cursor.Add(time.Duration(slotMinutes) * time.Minute)
 				if !overlapsAny(cursor, slotEnd, exceptions) {
@@ -248,3 +260,27 @@ func mapSlice[I any, O any](items []I, mapper func(I) O) []O {
 
 // pgxErrNoRows shadows the pgx import for internal use.
 var _ = pgx.ErrNoRows
+
+// stringToPgTime converts "HH:MM" or "HH:MM:SS" string to pgtype.Time (microseconds since midnight)
+func stringToPgTime(s string) pgtype.Time {
+	t, err := time.Parse("15:04", s)
+	if err != nil {
+		// Try with seconds
+		t, err = time.Parse("15:04:05", s)
+		if err != nil {
+			return pgtype.Time{Valid: false}
+		}
+	}
+	
+	hours := t.Hour()
+	minutes := t.Minute()
+	seconds := t.Second()
+	
+	totalSeconds := int64(hours*3600 + minutes*60 + seconds)
+	microseconds := totalSeconds * 1_000_000
+	
+	return pgtype.Time{
+		Microseconds: microseconds,
+		Valid:        true,
+	}
+}
