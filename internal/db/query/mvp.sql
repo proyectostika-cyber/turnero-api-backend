@@ -168,6 +168,9 @@ INSERT INTO tenant_channels (tenant_id, channel_type, external_id, external_key)
 VALUES ($1, $2, $3, $4)
 RETURNING id, tenant_id, channel_type, external_id, external_key, active, created_at;
 
+-- name: LockCustomerChannel :exec
+SELECT pg_advisory_xact_lock(hashtextextended(sqlc.arg(tenant_channel_id)::uuid::text || ':' || sqlc.arg(external_identifier)::text, 0));
+
 -- name: UpdateTenantChannel :one
 UPDATE tenant_channels
 SET channel_type = $2, external_id = $3, external_key = $4, active = $5

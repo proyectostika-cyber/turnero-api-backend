@@ -41,6 +41,9 @@ func (r *stubAdminRepo) CreateTenant(_ context.Context, _ db.CreateTenantParams)
 func (r *stubAdminRepo) UpdateTenant(_ context.Context, _ db.UpdateTenantParams) (db.Tenant, error) {
 	return db.Tenant{}, errStubNotImpl
 }
+func (r *stubAdminRepo) UpdateTenantGreeting(_ context.Context, _ db.UpdateTenantGreetingParams) (db.Tenant, error) {
+	return db.Tenant{}, errStubNotImpl
+}
 func (r *stubAdminRepo) DeactivateTenant(_ context.Context, _ uuid.UUID) (db.Tenant, error) {
 	return db.Tenant{}, errStubNotImpl
 }

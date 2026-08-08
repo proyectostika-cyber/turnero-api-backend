@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/unknowncode44/appointments/internal/api/dto"
 	"github.com/unknowncode44/appointments/internal/api/response"
 	db "github.com/unknowncode44/appointments/internal/db/sqlc"
@@ -105,7 +105,7 @@ func (s *appointmentService) List(ctx context.Context, tenantID uuid.UUID, provi
 	if customerID != nil {
 		customerIDValue = *customerID
 	}
-	
+
 	items, total, err := s.repo.ListAppointments(ctx, db.ListAppointmentsParams{
 		TenantID: tenantID,
 		Column2:  providerIDValue,
@@ -378,7 +378,7 @@ func (s *conversationService) ProcessEvolutionWebhook(ctx context.Context, req d
 		TenantID:   result.TenantID,
 		CustomerID: result.CustomerID,
 	})
-	
+
 	currentStep := "greeting"
 	stateData := json.RawMessage("{}")
 	if err == nil {
@@ -416,9 +416,8 @@ type inboundMessageResult struct {
 	CustomerID uuid.UUID
 }
 
-// storeInboundMessage resolves the tenant channel, finds-or-creates the customer
-// (upsert-safe to handle concurrent webhooks for the same number), and stores
-// the conversation message — all inside a single transaction.
+// storeInboundMessage resolves the tenant channel, serializes customer creation
+// for the channel identifier, and stores the message in a single transaction.
 func (s *conversationService) storeInboundMessage(ctx context.Context, req inboundMessage) (inboundMessageResult, error) {
 	var out inboundMessageResult
 	if req.ChannelExternalID == "" || req.ExternalCustomerID == "" || req.Message == "" {
@@ -435,6 +434,12 @@ func (s *conversationService) storeInboundMessage(ctx context.Context, req inbou
 		if err != nil {
 			return err
 		}
+		if err := q.LockCustomerChannel(ctx, db.LockCustomerChannelParams{
+			TenantChannelID:    channel.ID,
+			ExternalIdentifier: req.ExternalCustomerID,
+		}); err != nil {
+			return err
+		}
 
 		if _, err := q.CreateWebhookLog(ctx, db.CreateWebhookLogParams{
 			TenantID: uuid.NullUUID{UUID: channel.TenantID, Valid: true},
@@ -444,35 +449,33 @@ func (s *conversationService) storeInboundMessage(ctx context.Context, req inbou
 			return err
 		}
 
-		// Upsert-safe find-or-create: use UpsertCustomerChannel which internally
-		// does INSERT ... ON CONFLICT DO NOTHING and then selects the existing row.
-		// This eliminates the race condition between two concurrent webhooks for
-		// the same WhatsApp number.
-		customer, err := q.UpsertCustomerByChannel(ctx, db.UpsertCustomerByChannelParams{
-			TenantID:           channel.TenantID,
+		customer, err := q.GetCustomerByChannel(ctx, db.GetCustomerByChannelParams{
 			TenantChannelID:    channel.ID,
 			ExternalIdentifier: req.ExternalCustomerID,
 		})
+		if errors.Is(err, pgx.ErrNoRows) {
+			customer, err = q.CreateCustomer(ctx, db.CreateCustomerParams{
+				TenantID:  channel.TenantID,
+				FirstName: pgtype.Text{},
+				LastName:  pgtype.Text{},
+				Notes:     pgtype.Text{},
+			})
+			if err != nil {
+				return err
+			}
+			_, err = q.CreateCustomerChannel(ctx, db.CreateCustomerChannelParams{
+				CustomerID:         customer.ID,
+				TenantChannelID:    channel.ID,
+				ExternalIdentifier: req.ExternalCustomerID,
+			})
+		}
 		if err != nil {
 			return err
 		}
 
-		customerID, ok := customer.ID.(uuid.UUID)
-		if !ok {
-			// Try converting from []byte if necessary
-			if idBytes, ok := customer.ID.([]byte); ok {
-				customerID, err = uuid.FromBytes(idBytes)
-				if err != nil {
-					return err
-				}
-			} else {
-				return fmt.Errorf("unexpected customer ID type: %T", customer.ID)
-			}
-		}
-		
-		thread, err := q.GetConversationThreadByCustomer(ctx, db.GetConversationThreadByCustomerParams{TenantID: channel.TenantID, CustomerID: customerID})
+		thread, err := q.GetConversationThreadByCustomer(ctx, db.GetConversationThreadByCustomerParams{TenantID: channel.TenantID, CustomerID: customer.ID})
 		if errors.Is(err, pgx.ErrNoRows) {
-			thread, err = q.CreateConversationThread(ctx, db.CreateConversationThreadParams{TenantID: channel.TenantID, CustomerID: customerID})
+			thread, err = q.CreateConversationThread(ctx, db.CreateConversationThreadParams{TenantID: channel.TenantID, CustomerID: customer.ID})
 		}
 		if err != nil {
 			return err
@@ -490,14 +493,14 @@ func (s *conversationService) storeInboundMessage(ctx context.Context, req inbou
 
 		_, err = q.UpsertConversationState(ctx, db.UpsertConversationStateParams{
 			TenantID:   channel.TenantID,
-			CustomerID: customerID,
+			CustomerID: customer.ID,
 			State:      req.State,
 			Data:       req.Metadata,
 		})
 		out = inboundMessageResult{
 			Message:    msg,
 			TenantID:   channel.TenantID,
-			CustomerID: customerID,
+			CustomerID: customer.ID,
 		}
 		return err
 	})

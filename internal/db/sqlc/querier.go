@@ -72,6 +72,7 @@ type Querier interface {
 	ListTenants(ctx context.Context, arg ListTenantsParams) ([]ListTenantsRow, error)
 	ListUserProviders(ctx context.Context, userID int32) ([]uuid.UUID, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
+	LockCustomerChannel(ctx context.Context, arg LockCustomerChannelParams) error
 	ReleaseAppointmentSlot(ctx context.Context, id uuid.UUID) (AppointmentSlot, error)
 	RemoveUserProvider(ctx context.Context, arg RemoveUserProviderParams) error
 	ReserveAppointmentSlot(ctx context.Context, arg ReserveAppointmentSlotParams) (AppointmentSlot, error)
@@ -87,10 +88,6 @@ type Querier interface {
 	UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) (User, error)
 	UpdateUserTenant(ctx context.Context, arg UpdateUserTenantParams) (User, error)
 	UpsertConversationState(ctx context.Context, arg UpsertConversationStateParams) (ConversationState, error)
-	// Atomically finds or creates a customer for an inbound channel identifier.
-	// This prevents the race condition where two concurrent webhook calls for the
-	// same phone number both attempt to create the same customer.
-	UpsertCustomerByChannel(ctx context.Context, arg UpsertCustomerByChannelParams) (UpsertCustomerByChannelRow, error)
 }
 
 var _ Querier = (*Queries)(nil)

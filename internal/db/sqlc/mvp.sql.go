@@ -1540,6 +1540,20 @@ func (q *Queries) ListTenants(ctx context.Context, arg ListTenantsParams) ([]Lis
 	return items, nil
 }
 
+const lockCustomerChannel = `-- name: LockCustomerChannel :exec
+SELECT pg_advisory_xact_lock(hashtextextended($1::uuid::text || ':' || $2::text, 0))
+`
+
+type LockCustomerChannelParams struct {
+	TenantChannelID    uuid.UUID `json:"tenant_channel_id"`
+	ExternalIdentifier string    `json:"external_identifier"`
+}
+
+func (q *Queries) LockCustomerChannel(ctx context.Context, arg LockCustomerChannelParams) error {
+	_, err := q.db.Exec(ctx, lockCustomerChannel, arg.TenantChannelID, arg.ExternalIdentifier)
+	return err
+}
+
 const releaseAppointmentSlot = `-- name: ReleaseAppointmentSlot :one
 UPDATE appointment_slots
 SET status = 'available', appointment_id = NULL
