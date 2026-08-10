@@ -388,6 +388,44 @@ func (q *Queries) CreateCustomerChannel(ctx context.Context, arg CreateCustomerC
 	return i, err
 }
 
+const createEvolutionWebhookLog = `-- name: CreateEvolutionWebhookLog :one
+INSERT INTO webhook_logs (tenant_id, source, payload, tenant_channel_id, evolution_message_id)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (tenant_channel_id, evolution_message_id)
+WHERE tenant_channel_id IS NOT NULL AND evolution_message_id IS NOT NULL
+DO NOTHING
+RETURNING id, tenant_id, source, payload, created_at, tenant_channel_id, evolution_message_id
+`
+
+type CreateEvolutionWebhookLogParams struct {
+	TenantID           uuid.NullUUID `json:"tenant_id"`
+	Source             string        `json:"source"`
+	Payload            []byte        `json:"payload"`
+	TenantChannelID    pgtype.UUID   `json:"tenant_channel_id"`
+	EvolutionMessageID pgtype.Text   `json:"evolution_message_id"`
+}
+
+func (q *Queries) CreateEvolutionWebhookLog(ctx context.Context, arg CreateEvolutionWebhookLogParams) (WebhookLog, error) {
+	row := q.db.QueryRow(ctx, createEvolutionWebhookLog,
+		arg.TenantID,
+		arg.Source,
+		arg.Payload,
+		arg.TenantChannelID,
+		arg.EvolutionMessageID,
+	)
+	var i WebhookLog
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Source,
+		&i.Payload,
+		&i.CreatedAt,
+		&i.TenantChannelID,
+		&i.EvolutionMessageID,
+	)
+	return i, err
+}
+
 const createProvider = `-- name: CreateProvider :one
 INSERT INTO providers (tenant_id, name)
 VALUES ($1, $2)
@@ -585,9 +623,17 @@ type CreateWebhookLogParams struct {
 	Payload  []byte        `json:"payload"`
 }
 
-func (q *Queries) CreateWebhookLog(ctx context.Context, arg CreateWebhookLogParams) (WebhookLog, error) {
+type CreateWebhookLogRow struct {
+	ID        uuid.UUID     `json:"id"`
+	TenantID  uuid.NullUUID `json:"tenant_id"`
+	Source    string        `json:"source"`
+	Payload   []byte        `json:"payload"`
+	CreatedAt time.Time     `json:"created_at"`
+}
+
+func (q *Queries) CreateWebhookLog(ctx context.Context, arg CreateWebhookLogParams) (CreateWebhookLogRow, error) {
 	row := q.db.QueryRow(ctx, createWebhookLog, arg.TenantID, arg.Source, arg.Payload)
-	var i WebhookLog
+	var i CreateWebhookLogRow
 	err := row.Scan(
 		&i.ID,
 		&i.TenantID,

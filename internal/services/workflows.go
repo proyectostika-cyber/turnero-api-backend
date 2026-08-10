@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -356,6 +357,7 @@ func (s *conversationService) ProcessEvolutionWebhook(ctx context.Context, req d
 	result, err := s.storeInboundMessage(ctx, inboundMessage{
 		ChannelExternalID:  externalID,
 		ExternalCustomerID: externalCustomer,
+		EvolutionMessageID: req.ResolvedMessageID(),
 		Message:            message,
 		Source:             "evolution",
 		Metadata:           metadata,
@@ -396,13 +398,14 @@ func (s *conversationService) ProcessEvolutionWebhook(ctx context.Context, req d
 			CurrentStep: currentStep,
 			Data:        stateData,
 		},
-		Idempotent: true,
+		Idempotent: result.Idempotent,
 	}, nil
 }
 
 type inboundMessage struct {
 	ChannelExternalID  string
 	ExternalCustomerID string
+	EvolutionMessageID string
 	Message            string
 	Source             string
 	Metadata           []byte
@@ -414,6 +417,7 @@ type inboundMessageResult struct {
 	Message    db.ConversationMessage
 	TenantID   uuid.UUID
 	CustomerID uuid.UUID
+	Idempotent bool
 }
 
 // storeInboundMessage resolves the tenant channel, serializes customer creation
@@ -434,6 +438,35 @@ func (s *conversationService) storeInboundMessage(ctx context.Context, req inbou
 		if err != nil {
 			return err
 		}
+
+		messageID := req.EvolutionMessageID
+		hasMessageID := strings.TrimSpace(messageID) != ""
+		if hasMessageID {
+			if _, err := q.CreateEvolutionWebhookLog(ctx, db.CreateEvolutionWebhookLogParams{
+				TenantID:           uuid.NullUUID{UUID: channel.TenantID, Valid: true},
+				Source:             req.Source,
+				Payload:            req.LogPayload,
+				TenantChannelID:    pgtype.UUID{Bytes: channel.ID, Valid: true},
+				EvolutionMessageID: pgtype.Text{String: messageID, Valid: true},
+			}); errors.Is(err, pgx.ErrNoRows) {
+				customer, err := q.GetCustomerByChannel(ctx, db.GetCustomerByChannelParams{
+					TenantChannelID:    channel.ID,
+					ExternalIdentifier: req.ExternalCustomerID,
+				})
+				if err != nil {
+					return err
+				}
+				out = inboundMessageResult{
+					TenantID:   channel.TenantID,
+					CustomerID: customer.ID,
+					Idempotent: true,
+				}
+				return nil
+			} else if err != nil {
+				return err
+			}
+		}
+
 		if err := q.LockCustomerChannel(ctx, db.LockCustomerChannelParams{
 			TenantChannelID:    channel.ID,
 			ExternalIdentifier: req.ExternalCustomerID,
@@ -441,12 +474,14 @@ func (s *conversationService) storeInboundMessage(ctx context.Context, req inbou
 			return err
 		}
 
-		if _, err := q.CreateWebhookLog(ctx, db.CreateWebhookLogParams{
-			TenantID: uuid.NullUUID{UUID: channel.TenantID, Valid: true},
-			Source:   req.Source,
-			Payload:  req.LogPayload,
-		}); err != nil {
-			return err
+		if !hasMessageID {
+			if _, err := q.CreateWebhookLog(ctx, db.CreateWebhookLogParams{
+				TenantID: uuid.NullUUID{UUID: channel.TenantID, Valid: true},
+				Source:   req.Source,
+				Payload:  req.LogPayload,
+			}); err != nil {
+				return err
+			}
 		}
 
 		customer, err := q.GetCustomerByChannel(ctx, db.GetCustomerByChannelParams{

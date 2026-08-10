@@ -26,6 +26,7 @@ type Querier interface {
 	CreateConversationThread(ctx context.Context, arg CreateConversationThreadParams) (ConversationThread, error)
 	CreateCustomer(ctx context.Context, arg CreateCustomerParams) (Customer, error)
 	CreateCustomerChannel(ctx context.Context, arg CreateCustomerChannelParams) (CustomerChannel, error)
+	CreateEvolutionWebhookLog(ctx context.Context, arg CreateEvolutionWebhookLogParams) (WebhookLog, error)
 	CreateProvider(ctx context.Context, arg CreateProviderParams) (Provider, error)
 	CreateProviderAvailability(ctx context.Context, arg CreateProviderAvailabilityParams) (ProviderAvailability, error)
 	CreateProviderException(ctx context.Context, arg CreateProviderExceptionParams) (ProviderException, error)
@@ -36,7 +37,7 @@ type Querier interface {
 	// users.sql
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	CreateUserWithRole(ctx context.Context, arg CreateUserWithRoleParams) (User, error)
-	CreateWebhookLog(ctx context.Context, arg CreateWebhookLogParams) (WebhookLog, error)
+	CreateWebhookLog(ctx context.Context, arg CreateWebhookLogParams) (CreateWebhookLogRow, error)
 	DeactivateProvider(ctx context.Context, id uuid.UUID) (Provider, error)
 	DeactivateService(ctx context.Context, id uuid.UUID) (Service, error)
 	DeactivateTenant(ctx context.Context, id uuid.UUID) (DeactivateTenantRow, error)

@@ -236,17 +236,25 @@ type EvolutionWebhookRequest struct {
 	From       string `json:"from"`
 	Phone      string `json:"phone"`
 	Message    string `json:"message"`
+	MessageID  string `json:"messageId"`
 	Event      string `json:"event"`
 
 	// Evolution API v2 nested payload
 	Data EvolutionData `json:"data"`
 }
 
+func (r EvolutionWebhookRequest) ResolvedMessageID() string {
+	if r.Data.Key.ID != "" {
+		return r.Data.Key.ID
+	}
+	return r.MessageID
+}
+
 type EvolutionData struct {
-	Key          EvolutionKey          `json:"key"`
-	Message      EvolutionMessageBody  `json:"message"`
-	PushName     string                `json:"pushName"`
-	MessageType  string                `json:"messageType"`
+	Key         EvolutionKey         `json:"key"`
+	Message     EvolutionMessageBody `json:"message"`
+	PushName    string               `json:"pushName"`
+	MessageType string               `json:"messageType"`
 }
 
 type EvolutionKey struct {
@@ -256,8 +264,8 @@ type EvolutionKey struct {
 }
 
 type EvolutionMessageBody struct {
-	Conversation         string `json:"conversation"`
-	ExtendedTextMessage  *EvolutionExtendedText `json:"extendedTextMessage,omitempty"`
+	Conversation        string                 `json:"conversation"`
+	ExtendedTextMessage *EvolutionExtendedText `json:"extendedTextMessage,omitempty"`
 }
 
 type EvolutionExtendedText struct {
@@ -309,13 +317,13 @@ type UpdateConversationStateRequest struct {
 
 // EvolutionWebhookResponse is the response for Evolution API webhook processing
 type EvolutionWebhookResponse struct {
-	Processed         bool                    `json:"processed"`
-	TenantID          uuid.UUID               `json:"tenant_id"`
-	TenantName        string                  `json:"tenant_name"`
-	GreetingMessage   string                  `json:"greeting_message"`
-	CustomerID        uuid.UUID               `json:"customer_id"`
-	ConversationState ConversationStateData   `json:"conversation_state"`
-	Idempotent        bool                    `json:"idempotent"`
+	Processed         bool                  `json:"processed"`
+	TenantID          uuid.UUID             `json:"tenant_id"`
+	TenantName        string                `json:"tenant_name"`
+	GreetingMessage   string                `json:"greeting_message"`
+	CustomerID        uuid.UUID             `json:"customer_id"`
+	ConversationState ConversationStateData `json:"conversation_state"`
+	Idempotent        bool                  `json:"idempotent"`
 }
 
 // ConversationStateData holds current conversation state

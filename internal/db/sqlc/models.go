@@ -244,9 +244,11 @@ type UserProvider struct {
 }
 
 type WebhookLog struct {
-	ID        uuid.UUID     `json:"id"`
-	TenantID  uuid.NullUUID `json:"tenant_id"`
-	Source    string        `json:"source"`
-	Payload   []byte        `json:"payload"`
-	CreatedAt time.Time     `json:"created_at"`
+	ID                 uuid.UUID     `json:"id"`
+	TenantID           uuid.NullUUID `json:"tenant_id"`
+	Source             string        `json:"source"`
+	Payload            []byte        `json:"payload"`
+	CreatedAt          time.Time     `json:"created_at"`
+	TenantChannelID    pgtype.UUID   `json:"tenant_channel_id"`
+	EvolutionMessageID pgtype.Text   `json:"evolution_message_id"`
 }

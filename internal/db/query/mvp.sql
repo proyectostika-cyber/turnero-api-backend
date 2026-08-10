@@ -352,6 +352,14 @@ INSERT INTO webhook_logs (tenant_id, source, payload)
 VALUES ($1, $2, $3)
 RETURNING id, tenant_id, source, payload, created_at;
 
+-- name: CreateEvolutionWebhookLog :one
+INSERT INTO webhook_logs (tenant_id, source, payload, tenant_channel_id, evolution_message_id)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (tenant_channel_id, evolution_message_id)
+WHERE tenant_channel_id IS NOT NULL AND evolution_message_id IS NOT NULL
+DO NOTHING
+RETURNING id, tenant_id, source, payload, created_at, tenant_channel_id, evolution_message_id;
+
 -- name: GetTenantChannelByExternalID :one
 SELECT id, tenant_id, channel_type, external_id, external_key, active, created_at
 FROM tenant_channels
