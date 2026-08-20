@@ -38,9 +38,10 @@ func SetupRoutes(server *api.Server) error {
 	schedulingHandler := handlers.NewSchedulingMVPHandler(services.NewSchedulingService(schedulingRepo))
 	appointmentHandler := handlers.NewAppointmentMVPHandler(services.NewAppointmentService(workflowRepo))
 	conversationHandler := handlers.NewConversationMVPHandler(services.NewConversationService(workflowRepo))
+	evolutionHandler := handlers.NewN8NWhatsAppHandler(services.NewEvolutionService(server.Config))
 
-// DISABLED: 	// ── WhatsApp proxy (tenantUser only) ───────────────────────────────────
-// DISABLED: 	whatsappHandler := handlers.NewWhatsappHandler(server.Store, server.Config)
+	// DISABLED: 	// ── WhatsApp proxy (tenantUser only) ───────────────────────────────────
+	// DISABLED: 	whatsappHandler := handlers.NewWhatsappHandler(server.Store, server.Config)
 
 	// ── Webhook (public — Evolution calls without JWT) ──────────────────────
 	server.App.Post("/api/v1/webhooks/evolution", conversationHandler.EvolutionWebhook)
@@ -69,6 +70,7 @@ func SetupRoutes(server *api.Server) error {
 	n8n.Post("/customers", adminHandler.CreateCustomer)
 	n8n.Post("/appointments", appointmentHandler.Create)
 	n8n.Post("/inbound-messages", conversationHandler.InboundMessage)
+	n8n.Post("/whatsapp/send", evolutionHandler.SendText)
 
 	// PUT - Update endpoints
 	n8n.Put("/conversation-state/:customer_id", conversationHandler.UpdateConversationState)
@@ -165,14 +167,14 @@ func SetupRoutes(server *api.Server) error {
 	v1.Post("/conversations/message", adminOrTenant, conversationHandler.Message)
 	v1.Post("/inbound-messages", adminOrTenant, conversationHandler.InboundMessage)
 
-// DISABLED: 	// ── WhatsApp proxy (tenantUser only) ────────────────────────────────────
-// DISABLED: 	tenantOnly := middleware.RequireRole("tenantUser")
-// DISABLED: 	wa := v1.Group("/whatsapp", tenantOnly)
-// DISABLED: 	wa.Post("/instance", whatsappHandler.CreateInstance)
-// DISABLED: 	wa.Get("/instance/status", whatsappHandler.GetStatus)
-// DISABLED: 	wa.Get("/instance/qr", whatsappHandler.GetQR)
-// DISABLED: 	wa.Delete("/instance/logout", whatsappHandler.Logout)
-// DISABLED: 	wa.Delete("/instance", whatsappHandler.DeleteInstance)
+	// DISABLED: 	// ── WhatsApp proxy (tenantUser only) ────────────────────────────────────
+	// DISABLED: 	tenantOnly := middleware.RequireRole("tenantUser")
+	// DISABLED: 	wa := v1.Group("/whatsapp", tenantOnly)
+	// DISABLED: 	wa.Post("/instance", whatsappHandler.CreateInstance)
+	// DISABLED: 	wa.Get("/instance/status", whatsappHandler.GetStatus)
+	// DISABLED: 	wa.Get("/instance/qr", whatsappHandler.GetQR)
+	// DISABLED: 	wa.Delete("/instance/logout", whatsappHandler.Logout)
+	// DISABLED: 	wa.Delete("/instance", whatsappHandler.DeleteInstance)
 
 	return nil
 }
